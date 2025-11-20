@@ -1,8 +1,8 @@
-
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import SettingsPanel from '../components/SettingsPanel';
+import ApiKeysVault from '../components/ApiKeysVault';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function SettingsScreen() {
@@ -32,12 +32,18 @@ export default function SettingsScreen() {
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Settings</Text>
-      <Text style={styles.subtitle}>Configure your AI model parameters</Text>
+      <Text style={styles.subtitle}>Multi-cloud AI training platform configuration</Text>
 
       <View style={styles.userCard}>
         <Text style={styles.userLabel}>Signed in as</Text>
         <Text style={styles.userEmail}>{user?.email}</Text>
       </View>
+
+      <ApiKeysVault />
+
+      <View style={styles.divider} />
+
+      <Text style={styles.sectionTitle}>Model Parameters</Text>
 
       <SettingsPanel
         temperature={temperature}
@@ -77,6 +83,17 @@ const styles = StyleSheet.create({
   },
   userLabel: { fontSize: 12, color: '#94A3B8', marginBottom: 4 },
   userEmail: { fontSize: 16, fontWeight: '600', color: '#FFF' },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginVertical: 32,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFF',
+    marginBottom: 16,
+  },
   infoCard: {
     backgroundColor: 'rgba(59,130,246,0.05)',
     borderRadius: 16,

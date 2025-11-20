@@ -1,5 +1,29 @@
 import { supabase } from '../lib/supabase';
 
+export interface ApiKey {
+  id: string;
+  user_id: string;
+  provider: 'openai' | 'anthropic' | 'google' | 'azure' | 'deepseek';
+  api_key: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UploadedFile {
+  id: string;
+  user_id: string;
+  project_id?: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  storage_path: string;
+  extracted_text?: string;
+  processing_status: 'pending' | 'processing' | 'completed' | 'failed';
+  error_message?: string;
+  created_at: string;
+}
+
 export interface Project {
   id: string;
   user_id: string;
@@ -9,6 +33,7 @@ export interface Project {
   model_type: string;
   status: string;
   training_data?: string;
+  training_data_format?: 'json' | 'csv';
   settings: any;
   created_at: string;
   updated_at: string;
@@ -145,6 +170,117 @@ export const notebookService = {
       .eq('id', id);
 
     if (error) throw error;
+  },
+};
+
+export const apiKeyService = {
+  async getAll() {
+    const { data, error } = await supabase
+      .from('api_keys')
+      .select('*')
+      .order('provider', { ascending: true });
+
+    if (error) throw error;
+    return data as ApiKey[];
+  },
+
+  async getByProvider(provider: string) {
+    const { data, error } = await supabase
+      .from('api_keys')
+      .select('*')
+      .eq('provider', provider)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data as ApiKey | null;
+  },
+
+  async upsert(apiKey: Omit<ApiKey, 'id' | 'created_at' | 'updated_at'>) {
+    const { data, error } = await supabase
+      .from('api_keys')
+      .upsert(
+        [{ ...apiKey, updated_at: new Date().toISOString() }],
+        { onConflict: 'user_id,provider' }
+      )
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as ApiKey;
+  },
+
+  async delete(provider: string) {
+    const { error } = await supabase
+      .from('api_keys')
+      .delete()
+      .eq('provider', provider);
+
+    if (error) throw error;
+  },
+};
+
+export const fileService = {
+  async getAll() {
+    const { data, error } = await supabase
+      .from('uploaded_files')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data as UploadedFile[];
+  },
+
+  async getById(id: string) {
+    const { data, error } = await supabase
+      .from('uploaded_files')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data as UploadedFile | null;
+  },
+
+  async create(file: Omit<UploadedFile, 'id' | 'created_at'>) {
+    const { data, error } = await supabase
+      .from('uploaded_files')
+      .insert([file])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as UploadedFile;
+  },
+
+  async update(id: string, updates: Partial<UploadedFile>) {
+    const { data, error } = await supabase
+      .from('uploaded_files')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as UploadedFile;
+  },
+
+  async delete(id: string) {
+    const { error } = await supabase
+      .from('uploaded_files')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+  },
+
+  async uploadToStorage(filePath: string, file: Blob) {
+    const { data, error } = await supabase.storage
+      .from('training-data')
+      .upload(filePath, file);
+
+    if (error) throw error;
+    return data;
   },
 };
 

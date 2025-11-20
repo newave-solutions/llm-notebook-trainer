@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { supabase } from '../lib/supabase';
-import DataUpload from '../components/DataUpload';
+import { projectService } from '../services/database';
+import { useAuth } from '../contexts/AuthContext';
+import PdfUploadZone from '../components/PdfUploadZone';
 
 export default function CreateScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const { modelId } = useLocalSearchParams();
   const [projectName, setProjectName] = useState('');
   const [goal, setGoal] = useState('');
+  const [outputFormat, setOutputFormat] = useState<'json' | 'csv'>('json');
+  const [trainingData, setTrainingData] = useState('');
   const [loading, setLoading] = useState(false);
 
   const suggestions = [
@@ -20,34 +24,48 @@ export default function CreateScreen() {
     'Answer questions from data',
   ];
 
+  const handleFileUploaded = (fileId: string, extractedText: string) => {
+    setTrainingData(extractedText);
+    Alert.alert('Success', 'Training data extracted successfully!');
+  };
+
   const handleCreateProject = async () => {
     if (!projectName || !goal) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
+    if (!user?.id) {
+      Alert.alert('Error', 'You must be logged in to create a project');
+      return;
+    }
+
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('projects')
-        .insert({
-          user_id: 'demo-user',
-          name: projectName,
-          goal: goal,
-          model_name: modelId || 'gpt-3.5-turbo',
-          model_type: 'openai',
-          status: 'draft',
-        })
-        .select()
-        .single();
+      const project = await projectService.create({
+        user_id: user.id,
+        name: projectName,
+        goal: goal,
+        model_name: (modelId as string) || 'gpt-4-turbo',
+        model_type: 'openai',
+        status: 'draft',
+        training_data: trainingData,
+        training_data_format: outputFormat,
+        settings: {
+          temperature: 0.7,
+          maxTokens: 1000,
+        },
+      });
 
-      if (error) throw error;
-
-      Alert.alert('Success', 'Project created!', [
-        { text: 'OK', onPress: () => router.push({ pathname: '/notebook', params: { projectId: data.id } }) }
+      Alert.alert('Success', 'Project created successfully!', [
+        {
+          text: 'OK',
+          onPress: () =>
+            router.push({ pathname: '/notebook', params: { projectId: project.id } }),
+        },
       ]);
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      Alert.alert('Error', error.message || 'Failed to create project');
     } finally {
       setLoading(false);
     }
@@ -87,9 +105,48 @@ export default function CreateScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>Upload Training Data</Text>
-        <DataUpload onFileSelect={(file) => console.log('File selected:', file)} />
+        <PdfUploadZone
+          onFileUploaded={handleFileUploaded}
+          outputFormat={outputFormat}
+        />
 
+        <View style={styles.formatToggle}>
+          <Text style={styles.formatLabel}>Output Format:</Text>
+          <View style={styles.formatButtons}>
+            <TouchableOpacity
+              style={[
+                styles.formatButton,
+                outputFormat === 'json' && styles.formatButtonActive,
+              ]}
+              onPress={() => setOutputFormat('json')}
+            >
+              <Text
+                style={[
+                  styles.formatButtonText,
+                  outputFormat === 'json' && styles.formatButtonTextActive,
+                ]}
+              >
+                JSON
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.formatButton,
+                outputFormat === 'csv' && styles.formatButtonActive,
+              ]}
+              onPress={() => setOutputFormat('csv')}
+            >
+              <Text
+                style={[
+                  styles.formatButtonText,
+                  outputFormat === 'csv' && styles.formatButtonTextActive,
+                ]}
+              >
+                CSV
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
@@ -106,16 +163,72 @@ export default function CreateScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F172A', padding: 24 },
   title: { fontSize: 28, fontWeight: '800', color: '#FFF', marginBottom: 8 },
-  subtitle: { fontSize: 16, color: '#D1D5DB', marginBottom: 32 },
+  subtitle: { fontSize: 16, color: '#64748B', marginBottom: 32 },
   form: { gap: 20 },
   label: { fontSize: 16, fontWeight: '600', color: '#FFF', marginBottom: 8 },
-  input: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 16, color: '#FFF', fontSize: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  input: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    padding: 16,
+    color: '#FFF',
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
   textArea: { minHeight: 120, textAlignVertical: 'top' },
-  suggestionsLabel: { fontSize: 14, color: '#A78BFA', fontWeight: '600', marginTop: 8 },
+  suggestionsLabel: { fontSize: 14, color: '#60A5FA', fontWeight: '600', marginTop: 8 },
   suggestions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { backgroundColor: 'rgba(139,92,246,0.2)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#8B5CF6' },
-  chipText: { color: '#A78BFA', fontSize: 13 },
-  button: { backgroundColor: '#8B5CF6', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 16 },
+  chip: {
+    backgroundColor: 'rgba(59,130,246,0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(59,130,246,0.3)',
+  },
+  chipText: { color: '#60A5FA', fontSize: 13 },
+  formatToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  formatLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  formatButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  formatButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  formatButtonActive: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#3B82F6',
+  },
+  formatButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  formatButtonTextActive: {
+    color: '#FFF',
+  },
+  button: {
+    backgroundColor: '#3B82F6',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 24,
+  },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
 });
