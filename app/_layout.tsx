@@ -1,26 +1,41 @@
 import { Stack } from "expo-router";
+import { AuthProvider } from "./contexts/AuthContext";
 
-// Polyfill fetch to prevent Supabase from trying to import @supabase/node-fetch
-// This is a no-op in React Native where fetch already exists
 if (typeof globalThis.fetch === 'undefined') {
-  // @ts-ignore
   globalThis.fetch = fetch;
 }
 
 export default function RootLayout() {
   return (
-    <Stack
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: '#1E293B',
-        },
-        headerTintColor: '#FFF',
-        contentStyle: {
-          backgroundColor: '#0F172A',
-        },
-      }}
-    >
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-    </Stack>
+    <AuthProvider>
+      <Stack
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: '#1E293B',
+          },
+          headerTintColor: '#FFF',
+          contentStyle: {
+            backgroundColor: '#0F172A',
+          },
+        }}
+      >
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="auth/login"
+          options={{
+            headerShown: false,
+            presentation: 'modal',
+          }}
+        />
+        <Stack.Screen
+          name="auth/signup"
+          options={{
+            headerShown: false,
+            presentation: 'modal',
+          }}
+        />
+      </Stack>
+    </AuthProvider>
   );
 }
