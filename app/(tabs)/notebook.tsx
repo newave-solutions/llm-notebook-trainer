@@ -1,76 +1,121 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import NotebookCell from '../components/NotebookCell';
-import { supabase } from '../lib/supabase';
+/**
+ * @file notebook.tsx
+ * @description No-Code AI Generation Studio
+ * @module screens
+ *
+ * Transformed from Jupyter-style notebook to guided wizard.
+ * Users never see or interact with code - just intuitive controls.
+ *
+ * Features:
+ * - Step-by-step wizard interface
+ * - Visual model selection
+ * - User-friendly parameter controls
+ * - Training mode through conversation
+ * - Export and save functionality
+ */
+
+import React, { useState } from 'react';
+import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import GenerationStudio from '../components/organisms/GenerationStudio';
+import TrainingStudio from '../components/organisms/TrainingStudio';
+
+type StudioMode = 'generate' | 'train';
 
 export default function NotebookScreen() {
-  const { projectId } = useLocalSearchParams();
-  const [cells, setCells] = useState([
-    { id: '1', type: 'code', content: '', output: '' },
-  ]);
+  const [mode, setMode] = useState<StudioMode>('generate');
+  const [trainingSessionId] = useState(() => Date.now().toString());
 
-  const handleContentChange = (id: string, content: string) => {
-    setCells(cells.map(c => c.id === id ? { ...c, content } : c));
+  const handleSaveGeneration = (result: any) => {
+    console.log('Save generation:', result);
   };
 
-  const handleExecute = async (id: string) => {
-    const cell = cells.find(c => c.id === id);
-    if (!cell) return;
-
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-content', {
-        body: {
-          prompt: cell.content,
-          model: 'gpt-3.5-turbo',
-          temperature: 0.7,
-          maxTokens: 500,
-        },
-      });
-
-      if (error) throw error;
-
-      const output = data?.choices?.[0]?.message?.content || 'No response';
-      setCells(cells.map(c => c.id === id ? { ...c, output } : c));
-    } catch (error: any) {
-      Alert.alert('Error', error.message);
-    }
+  const handleStartTraining = (result: any) => {
+    setMode('train');
   };
 
-  const addCell = () => {
-    setCells([...cells, { id: Date.now().toString(), type: 'code', content: '', output: '' }]);
+  const handleTrainingComplete = (exportedData: string) => {
+    console.log('Training complete:', exportedData);
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>AI Notebook</Text>
-        <TouchableOpacity style={styles.addButton} onPress={addCell}>
-          <Text style={styles.addButtonText}>+ Add Cell</Text>
+      <View style={styles.modeSelector}>
+        <TouchableOpacity
+          style={[styles.modeButton, mode === 'generate' && styles.modeButtonActive]}
+          onPress={() => setMode('generate')}
+        >
+          <Text
+            style={[
+              styles.modeButtonText,
+              mode === 'generate' && styles.modeButtonTextActive,
+            ]}
+          >
+            Generate
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.modeButton, mode === 'train' && styles.modeButtonActive]}
+          onPress={() => setMode('train')}
+        >
+          <Text
+            style={[
+              styles.modeButtonText,
+              mode === 'train' && styles.modeButtonTextActive,
+            ]}
+          >
+            Train
+          </Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scroll}>
-        {cells.map((cell) => (
-          <NotebookCell
-            key={cell.id}
-            cellType={cell.type as 'code' | 'markdown'}
-            content={cell.content}
-            output={cell.output}
-            onContentChange={(content) => handleContentChange(cell.id, content)}
-            onExecute={() => handleExecute(cell.id)}
-          />
-        ))}
-      </ScrollView>
+      {mode === 'generate' ? (
+        <GenerationStudio
+          onSave={handleSaveGeneration}
+          onTrain={handleStartTraining}
+        />
+      ) : (
+        <TrainingStudio
+          sessionId={trainingSessionId}
+          modelId="gpt-3.5-turbo"
+          onComplete={handleTrainingComplete}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F172A' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 24, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
-  title: { fontSize: 24, fontWeight: '800', color: '#FFF' },
-  addButton: { backgroundColor: '#8B5CF6', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  addButtonText: { color: '#FFF', fontSize: 14, fontWeight: '600' },
-  scroll: { flex: 1, padding: 24 },
+  container: {
+    flex: 1,
+    backgroundColor: '#0F172A',
+  },
+  modeSelector: {
+    flexDirection: 'row',
+    padding: 16,
+    gap: 12,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  modeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+  },
+  modeButtonActive: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#3B82F6',
+  },
+  modeButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#94A3B8',
+  },
+  modeButtonTextActive: {
+    color: '#FFF',
+  },
 });
